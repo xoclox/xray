@@ -1,0 +1,52 @@
+name: Build Core
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm, arm64]
+        os: [linux]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: twnesss/xray
+          path: xray
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ^1.23
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu upx
+
+      - name: Build Core
+        run: |
+          cd xray
+          GOARCH=${{ matrix.arch }} GOOS=linux CC=$([[ ${{ matrix.arch }} == 'arm' ]] && echo 'arm-linux-gnueabi-gcc' || echo 'aarch64-linux-gnu-gcc') make
+
+      - name: Compress with UPX
+        run: |
+          cd xray
+          upx --ultra-brute xray
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xray-${{ matrix.os }}-${{ matrix.arch }}
+          path: ./xray/xray
